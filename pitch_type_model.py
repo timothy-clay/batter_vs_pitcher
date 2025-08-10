@@ -1,0 +1,195 @@
+import torch
+import torch.optim as optim
+import torch.nn as nn
+import matplotlib.pyplot as plt
+from copy import deepcopy
+
+class PitchTypeDataset(torch.utils.data.Dataset):
+    """
+    Description:
+        A class that builds a custom PyTorch Dataset that stores pitcher_ids in addition to X and y features.
+    """
+    def __init__(self, X, pitcher_ids, y):
+        """
+        Description:
+            Creates a PitchTypeDataset object
+            
+        Inputs:
+            X (torch.tensor): a tensor of numeric X features
+            pitcher_ids (torch.tensor): a tensor of pre-encoded pitcher IDs
+            y (torch.tensor): a tensor of target y features
+        
+        Outpus:
+            None
+        """
+        
+        self.X = X
+        self.pitcher_ids = pitcher_ids
+        self.y = y
+
+    def __len__(self):
+        return len(self.y)
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.pitcher_ids[idx], self.y[idx]
+    
+    
+class ffnn(nn.Module):
+    
+    """ 
+    Description:
+        a class to define a feed-forward neural network that works with predicting pitch type thrown by a pitcher 
+    """
+   
+    def __init__(self, input_dim, num_pitchers, num_classes=1, pitcher_embedding_dim: int = 4):
+        
+        """
+        Description:
+            Initializes the architecture for the feed-forward neural network.
+            
+        Inputs:
+            input_dim (int): how many columns are in the input (X) data
+            num_pitchers (int): how many pitchers are in the dataset
+            num_classes (int): how many outputs are expected
+            pitcher_embedding_dim (int): how many dimensions each pitcher ID should be split into
+            
+        """
+        
+        # update the input dimension to account for the size of the pitcher embeddings
+        input_dim += pitcher_embedding_dim
+              
+        super().__init__()
+        
+        # create embedding layer
+        self.pitcher_embedding = nn.Embedding(num_embeddings=num_pitchers, embedding_dim=pitcher_embedding_dim)
+        
+        # define model architecture
+        self.model = nn.Sequential(
+            
+            nn.Linear(input_dim, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+
+            nn.Linear(64, 32),
+            nn.ReLU(),  
+
+            nn.Linear(32, num_classes)  
+        )
+    
+    def forward(self, X, pitcher_id):
+        
+        """
+        Description:
+            Defines the behavior for the forward pass.
+            
+        Inputs:
+            X (torch.tensor): the raw input data
+            pitcher_id (torch.tensor): the pitcher IDs corresponding to each row of the raw input data
+            
+        Outputs:
+            output (torch.tensor): the result from passing the data though the model
+        """
+        
+        # get embeddings for the pitcher ID
+        pitcher_emb = self.pitcher_embedding(pitcher_id)
+        
+        # add pitcher embeddings to the raw X data
+        X_with_pitchers = torch.cat([X, pitcher_emb], dim=1)
+
+        # pass input data through model architecture 
+        output = self.model(X_with_pitchers)
+
+        return output
+    
+    
+def train(model, train_loader, test_loader, epochs=50, patience=10, loss_fn=None, optimizer=None):
+    """
+    Description:
+        Trains a provided feed-forward neural network using provided training and testing data loaders
+        
+    Inputs:
+        model (batter_models.ffnn): the input model, which has the same architecture as defined in pitch_type_model.ffnn
+        train_loader (torch.DataLoader): the training data, in DataLoader format
+        test_loader (torch.DataLoader): the testing data, in DataLoader format
+        epochs (int): how many times the training loop should iterate through the DataLoaders
+        patience (int): how many epochs the training loop will wait before terminating without an improvement in validation loss
+        loss_fn: the function that will compute the loss
+        optimizer: the optimizer that should be used by the training loop
+    """
+    
+    # auto fills the loss function and optimizer if not specified
+    if loss_fn is None:
+        loss_fn = nn.CrossEntropyLoss()
+    
+    if optimizer is None:
+        optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    # initialize lists to store the training and validation losses
+    train_losses, val_losses = [], []
+    
+    # initialize variables to help with early stopping and version caching
+    best_val_loss = float('inf')
+    best_model_weights = deepcopy(model.state_dict())
+    epochs_no_improve = 0
+
+    for epoch in range(epochs):
+        
+        ### training portion ###
+
+        model.train() # set model to train mode
+        
+        cumulative_train_loss = 0
+        for X_batch, pitchers_batch, y_batch in train_loader:
+            
+            optimizer.zero_grad() # get gradients
+            outputs = model(X_batch, pitchers_batch) # get predictions
+            loss = loss_fn(outputs, y_batch) # compute loss and back propogate
+            loss.backward() # adjust weights
+            optimizer.step() # update gradients
+            cumulative_train_loss += loss.item() * X_batch.size(0) # add to the loss
+
+        train_losses.append(cumulative_train_loss/len(train_loader.dataset)) # save train loss for the epoch
+        
+        ### evaluation portion ###
+        
+        model.eval() # set model to evaluation mode
+        
+        cumulative_val_loss = 0
+        with torch.no_grad():
+            for X_val, pitchers_val, y_val in test_loader:
+                y_pred = model(X_val, pitchers_val) # get predictions
+                val_loss = loss_fn(y_pred, y_val) # calculate loss of predictions
+                cumulative_val_loss += val_loss.item() * X_val.size(0) # scale loss and add to cumulative loss
+                
+        val_losses.append(cumulative_val_loss / len(test_loader.dataset)) # save validation loss for the epoch
+        
+        # check if the most recent validation loss is better than the best seen, and update early stopping variables accordingly
+        if val_losses[-1] < best_val_loss:
+            best_val_loss = val_losses[-1]
+            best_model_weights = deepcopy(model.state_dict())
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
+        
+        # print the loss to the console
+        print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_losses[-1]:.4f} - Validation Loss: {val_losses[-1]:.4f}")
+        
+        # checks if the early stopping condition is met
+        if epochs_no_improve >= patience:
+            print(f"Early stopping triggered after {epoch+1} epochs.")
+            break
+            
+    # revert the model to the state that produced the best validation score
+    model.load_state_dict(best_model_weights)
+        
+    return train_losses, val_losses
+
+
+if __name__=="__main__":
+    pass

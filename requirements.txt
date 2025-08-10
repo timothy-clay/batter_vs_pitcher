@@ -1,0 +1,9 @@
+pandas
+dash
+plotly
+matplotlib
+seaborn
+torch
+pyarrow
+scikit-learn
+dash_bootstrap_components
