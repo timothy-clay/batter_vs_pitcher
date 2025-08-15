@@ -81,29 +81,31 @@ def sample_pitch_location(row, models, data):
     pt_enc_tensor = torch.tensor(pt_enc, dtype=torch.int32)
 
     # run the model
-    pitch_location_logits = pitch_location_model(X_tensor, p_enc_tensor, pt_enc_tensor)
-
-    # extract the different components of the result distribution 
-    mu_x = pitch_location_logits[0].detach()
-    mu_z = pitch_location_logits[1].detach()
-    sigma_x = pitch_location_logits[2].detach()
-    sigma_z = pitch_location_logits[3].detach()
-    rho = pitch_location_logits[4].detach()
-
-    # create mean and covariance matrix
-    mean = torch.tensor([mu_x, mu_z])
-    cov = torch.tensor([
-        [sigma_x**2, rho * sigma_x * sigma_z],
-        [rho * sigma_x * sigma_z, sigma_z**2]
-    ])
+    pitch_location_logits = pitch_location_model(X_tensor, p_enc_tensor, pt_enc_tensor).detach()
     
-    # sample pitch location using the mean and covariance matrix
-    mvn = MultivariateNormal(loc=mean, covariance_matrix=cov)
-    sampled_location = mvn.sample()
+    # convert the raw logits to probabilities and samples from said probabilities
+    pitch_location_probs = F.softmax(pitch_location_logits, dim=1)  
+    sampled_idx = torch.multinomial(pitch_location_probs, num_samples=1).item()
+    
+    # define pitch zone dimensions
+    x_edges = np.linspace(-2, 2, 11)
+    z_edges = np.linspace(0, 5, 11)
+
+    # convert sampled_index back to row and column indices
+    sampled_row = sampled_idx // 10
+    sampled_col = sampled_idx % 10
+
+    # define sampled zone edges
+    x_min, x_max = x_edges[sampled_col], x_edges[sampled_col + 1]
+    z_min, z_max = z_edges[sampled_row], z_edges[sampled_row + 1]
+
+    # sample from the selected zone
+    x_sample = np.random.uniform(x_min, x_max)
+    z_sample = np.random.uniform(z_min, z_max)
 
     # update the input dict with the sampled pitch locations
-    row['plate_x'] = sampled_location[0].item()
-    row['plate_z'] = sampled_location[1].item()
+    row['plate_x'] = x_sample
+    row['plate_z'] = z_sample
 
     # define the pitch characteristics to be sampled
     pitch_chars = ['arm_angle', 'release_pos_x', 'release_pos_y', 'release_extension', 'release_speed', 
@@ -371,6 +373,8 @@ def sample_pas(batter_id, pitcher_id, models, data, epochs=1000):
 
     # add count column for downstream count-specific filtering
     all_pas_df["count"] = all_pas_df["balls"].astype(str) + "-" + all_pas_df["strikes"].astype(str)
+    
+    all_pas_df = all_pas_df.loc[:, ['pitcher', 'batter', 'count', 'pitch_type', 'plate_x', 'plate_z', 'sz_top', 'sz_bot', 'release_speed', 'release_spin_rate', 'pfx_x', 'pfx_z', 'outcome', 'terminal_outcome']]
             
     return all_pas_df
 

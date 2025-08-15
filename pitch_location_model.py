@@ -24,17 +24,24 @@ def bivariate_loss(x, z, mu_x, mu_z, sigma_x, sigma_z, rho):
         
     """
     
-    # normalizes x and z
-    norm_x = (x - mu_x) / sigma_x
-    norm_z = (z - mu_z) / sigma_z
+    dx = (x.unsqueeze(-1) - mu_x) / sigma_x
+    dz = (z.unsqueeze(-1) - mu_z) / sigma_z
     
-    # computes the z value, loss denominator, and log term
-    z_val = norm_x**2 + norm_z**2 - 2*rho*norm_x*norm_z
-    denom = 2 * (1 - rho**2)
-    log_term = torch.log(2 * torch.pi * sigma_x * sigma_z * torch.sqrt(1 - rho**2))
+    one_minus_r2 = (1 - rho**2).clamp(1e-6, 1.0)
+    z_term = (dx**2 - 2*rho*dx*dz + dz**2) / one_minus_r2
+    log_norm = torch.log(2 * torch.pi * sigma_x * sigma_z * torch.sqrt(one_minus_r2))
     
-    # returns final loss computation
-    loss = 0.5 * z_val / denom + log_term
+    loss = -0.5 * z_term - log_norm
+    
+    return loss
+
+def mdn_nll(x, z, mu_x, mu_z, sx, sz, rho, pi):
+    
+    log_prob_k = bivariate_loss(x, z, mu_x, mu_z, sx, sz, rho) 
+    log_mix = torch.log(pi.clamp_min(1e-9)) + log_prob_k       
+    log_sum = torch.logsumexp(log_mix, dim=-1)   
+    
+    loss = -log_sum.mean()
     
     return loss
 
@@ -76,13 +83,7 @@ class ffnn(nn.Module):
         a class to define a feed-forward neural network that works with predicting x and z coordinates of a certain pitch type 
     """
    
-    def __init__(self, 
-                 input_dim, 
-                 num_pitchers, 
-                 num_pitch_types,
-                 num_classes=5, 
-                 pitcher_emb_dim=4,
-                 pitch_type_emb_dim=8):
+    def __init__(self, input_dim, num_pitchers, num_pitch_types, num_classes=1, pitcher_emb_dim=4, pitch_type_emb_dim=8):
         
         """
         Description:
@@ -123,7 +124,7 @@ class ffnn(nn.Module):
             nn.Linear(64, 32),
             nn.ReLU(),  
 
-            nn.Linear(32, 5)  
+            nn.Linear(32, num_classes)  
         )
     
     def forward(self, X, pitcher_id, pitch_type):
@@ -150,19 +151,12 @@ class ffnn(nn.Module):
         
         # pass input data through model architecture 
         output = self.model(X_embeddings)
-
-        # adjust outputs as needed to meet restrictions
-        mu_x, mu_z = output[:, 0], output[:, 1]
-        sigma_x = F.softplus(output[:, 2]) + 1e-6
-        sigma_z = F.softplus(output[:, 3]) + 1e-6
-        rho = torch.tanh(output[:, 4])
         
-        return mu_x, mu_z, sigma_x, sigma_z, rho
+        return output
     
         
 
-
-def train(model, train_loader, test_loader, epochs=50, patience=10, loss_fn=bivariate_loss, optimizer=None):
+def train(model, train_loader, test_loader, epochs=50, patience=10, loss_fn=None, optimizer=None):
     """
     Description:
         Trains a provided feed-forward neural network using provided training and testing data loaders
@@ -177,7 +171,10 @@ def train(model, train_loader, test_loader, epochs=50, patience=10, loss_fn=biva
         optimizer: the optimizer that should be used by the training loop
     """
     
-    # auto fills the optimizer if not specified
+    # auto fills the loss function and optimizer if not specified
+    if loss_fn is None:
+        loss_fn = nn.CrossEntropyLoss()
+        
     if optimizer is None:
         optimizer = optim.Adam(model.parameters(), lr=0.001)
 
@@ -199,8 +196,8 @@ def train(model, train_loader, test_loader, epochs=50, patience=10, loss_fn=biva
         for X_batch, pitchers_batch, pitch_types_batch, y_batch in train_loader:
             
             optimizer.zero_grad() # get gradients
-            mu_x, mu_z, sigma_x, sigma_z, rho = model(X_batch, pitchers_batch, pitch_types_batch)
-            loss = loss_fn(y_batch[:, 0], y_batch[:, 1], mu_x, mu_z, sigma_x, sigma_z, rho).mean()
+            outputs = model(X_batch, pitchers_batch, pitch_types_batch) # get predictions
+            loss = loss_fn(outputs, y_batch) # compute loss and back propogate
             loss.backward() # adjust weights
             optimizer.step() # update gradients
             cumulative_train_loss += loss.item() * X_batch.size(0) # add to the loss
@@ -216,10 +213,10 @@ def train(model, train_loader, test_loader, epochs=50, patience=10, loss_fn=biva
             for X_val, pitchers_val, pitch_types_val, y_val in test_loader:
                 
                 # get predictions
-                mu_x_pred, mu_z_pred, sigma_x_pred, sigma_z_pred, rho_pred = model(X_val, pitchers_val, pitch_types_val)
+                y_pred = model(X_val, pitchers_val, pitch_types_val)
                 
                 # calculate loss of predictions
-                val_loss = loss_fn(y_val[:, 0], y_val[:, 1], mu_x_pred, mu_z_pred, sigma_x_pred, sigma_z_pred, rho_pred).mean()
+                val_loss = loss_fn(y_pred, y_val)
                 
                 # scale loss and add to cumulative loss
                 cumulative_val_loss += val_loss.item() * X_val.size(0) 

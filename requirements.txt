@@ -7,4 +7,3 @@ torch
 pyarrow
 scikit-learn
 dash_bootstrap_components
-gunicorn
