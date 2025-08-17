@@ -12,6 +12,8 @@ from sample_pitches import sample_pas
 from dashboard_functions import get_summary_stats, get_pitches_summary
 
 import dash
+from flask_caching import Cache
+import uuid
 from dash import dcc, html, Output, Input, State, dash_table, ctx, callback_context
 import dash_bootstrap_components as dbc
 import pandas as pd
@@ -79,6 +81,8 @@ pitch_names = {
 app = dash.Dash(__name__)
 
 server = app.server
+
+cache = Cache(server, config={"CACHE_TYPE": "SimpleCache"})
 
 app.layout = html.Div([
     dcc.Store(id='data-store'),
@@ -384,7 +388,11 @@ def run_model(n_clicks, back_clicks, batter, pitcher):
 
     df = sample_pas(batter, pitcher, models=models, data=data)
 
-    return df.to_dict('records'), dash.no_update, {'display': 'none'}, {'display': 'flex'}
+    # Create a unique key and cache it server-side
+    key = str(uuid.uuid4())
+    cache.set(key, df, timeout=600)  # store for 10 minutes
+
+    return key, dash.no_update, {'display': 'none'}, {'display': 'flex'}
 
 @app.callback(
     Output('summary-output', 'children'),
@@ -397,7 +405,7 @@ def update_summary(selectedData, stored_data, applied_filters):
     if stored_data is None:
         return html.Div("No data to summarize.")
 
-    df = pd.DataFrame(stored_data)
+    df = cache.get(stored_data)
 
     if applied_filters['pitch_types']:
         df = df[df['pitch_type'].isin(applied_filters['pitch_types'])]
@@ -513,7 +521,7 @@ def update_pitches_summary_table(selectedData, stored_data, applied_filters):
     if stored_data is None:
         return html.Div("No data to summarize.")
 
-    df = pd.DataFrame(stored_data)
+    df = cache.get(stored_data)
 
     if applied_filters['pitch_types']:
         df = df[df['pitch_type'].isin(applied_filters['pitch_types'])]
@@ -569,7 +577,7 @@ def update_pitch_type_checklist(stored_data):
     if stored_data is None:
         return [], []
 
-    df = pd.DataFrame(stored_data)
+    df = cache.get(stored_data)
     pitch_types = df.groupby('pitch_type').agg({'pitcher':'count'}).reset_index().sort_values(by=['pitcher'], ascending=False)['pitch_type'].unique()
     
     options = [{'label': pitch_names[pt], 'value': pt} for pt in pitch_types]
@@ -640,7 +648,7 @@ def update_plot(stored_data, applied_filters):
     if stored_data is None:
         return px.scatter(title="No Data")
     
-    df = pd.DataFrame(stored_data)
+    df = cache.get(stored_data)
 
     if applied_filters['pitch_types']:
         df = df[df['pitch_type'].isin(applied_filters['pitch_types'])]
@@ -717,7 +725,7 @@ def update_pitch_break_plot(stored_data, applied_filters):
     if stored_data is None:
         return px.scatter(title="No Data")
     
-    df = pd.DataFrame(stored_data)
+    df = cache.get(stored_data)
 
     if applied_filters['pitch_types']:
         df = df[df['pitch_type'].isin(applied_filters['pitch_types'])]

@@ -69,9 +69,29 @@ def sample_pitch_location(row, models, data):
     plm_pitcher_le = models['label_encoders']['plm_pitcher_le']
     plm_pitch_type_le = models['label_encoders']['plm_pitch_type_le']
     pitch_location_model = models['models']['pitch_location_model']
+    
+    # define the pitch characteristics to be sampled
+    pitch_chars = ['arm_angle', 'release_pos_x', 'release_pos_y', 'release_extension', 'release_speed', 'release_spin_rate', 'spin_axis', 'pfx_x', 'pfx_z']
+
+    # locate for the current pitcher and pitch type the mean and standard deviation for each of the pitch characteristics 
+    pitch_data = pitch_characteristics_df.loc[
+        (pitch_characteristics_df['pitcher'] == row['pitcher']) &
+        (pitch_characteristics_df['pitch_type'] == row['pitch_type'])
+    ]
+
+    # extract the means and standard deviations
+    means = torch.tensor([pitch_data[f'{char}_mean'].values[0] for char in pitch_chars],dtype=torch.float32)
+    stds  = torch.tensor([pitch_data[f'{char}_std'].values[0] for char in pitch_chars],dtype=torch.float32)
+
+    # sample each of the pitch characteristics
+    samples = torch.normal(means, stds)
+
+    # update the input dict with the sampled pitch characteristics
+    for idx, pitch_char in enumerate(pitch_chars):
+        row[pitch_char] = samples[idx].item()
 
     # extract and scale the X features and encode both the pitcher ID and pitch type
-    X = plm_scaler.transform([[row[feat] for feat in models['features']['pitch_X_feats']]])
+    X = plm_scaler.transform([[row[feat] for feat in models['features']['pitch_X_feats'] + pitch_chars]])
     p_enc = plm_pitcher_le.transform([row['pitcher']])
     pt_enc = plm_pitch_type_le.transform([row['pitch_type']])
 
@@ -106,27 +126,6 @@ def sample_pitch_location(row, models, data):
     # update the input dict with the sampled pitch locations
     row['plate_x'] = x_sample
     row['plate_z'] = z_sample
-
-    # define the pitch characteristics to be sampled
-    pitch_chars = ['arm_angle', 'release_pos_x', 'release_pos_y', 'release_extension', 'release_speed', 
-                             'release_spin_rate', 'spin_axis', 'pfx_x', 'pfx_z']
-
-    # locate for the current pitcher and pitch type the mean and standard deviation for each of the pitch characteristics 
-    pitch_data = pitch_characteristics_df.loc[
-        (pitch_characteristics_df['pitcher'] == row['pitcher']) &
-        (pitch_characteristics_df['pitch_type'] == row['pitch_type'])
-    ]
-
-    # extract the means and standard deviations
-    means = torch.tensor([pitch_data[f'{char}_mean'].values[0] for char in pitch_chars],dtype=torch.float32)
-    stds  = torch.tensor([pitch_data[f'{char}_std'].values[0] for char in pitch_chars],dtype=torch.float32)
-
-    # sample each of the pitch characteristics
-    samples = torch.normal(means, stds)
-
-    # update the input dict with the sampled pitch characteristics
-    for idx, pitch_char in enumerate(pitch_chars):
-        row[pitch_char] = samples[idx].item()
         
     # no return (modifies dict in place)
     
