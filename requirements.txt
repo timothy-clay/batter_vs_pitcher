@@ -7,4 +7,8 @@ torch
 pyarrow
 scikit-learn
 dash_bootstrap_components
+<<<<<<< HEAD
 Flask-Caching
+=======
+gunicorn
+>>>>>>> af7014ee2a78c95d393a5225d3869506735ea30f
