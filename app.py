@@ -88,53 +88,37 @@ app.layout = html.Div([
     dcc.Store(id='data-store'),
     dcc.Store(id='applied-filters'),
 
-    html.Div(id='input-screen',
+    html.Div(id='input-screen', 
+             className='visible-page',
              children=[
-                html.H1("MLB Matchup Simulator", style={'margin':'0', 'margin-top':'30px', 'margin-left':'20px'}),
-                html.P("Created by Timothy Clay", style={'margin':'0', 'margin-top':'10px', 'margin-left':'20px'}),
+                html.H1("MLB Matchup Simulator"),
+                html.P("Created by Timothy Clay"),
                 html.Div(
                     id='input-screen-container',
-                    style={
-                        'margin-top':'20px',
-                        'display': 'flex',
-                        'justifyContent': 'center',
-                        'alignItems': 'center', 
-                        'textAlign': 'center'
-                    },
                     children=[
 
                         # Left: Pitcher headshot
                         html.Div(
                             id="input-pitcher-headshot",
-                            style={'width': '150px'}
                         ),
 
                         # Middle: your original input-screen box
                         html.Div(
-                            style={
-                                'width': '350px',
-                                'textAlign': 'center'
-                            },
+                            id="dropdowns-section",
                             children=[
-                                html.H2(
-                                    "Choose Matchup",
-                                    style={'marginBottom': '20px', 'color': '#333'}
-                                ),
-
-                                html.Label("Pitcher", style={'fontWeight': 'bold', 'marginBottom': '5px'}),
+                                html.H2("Choose Matchup"),
+                                html.Label("Pitcher"),
                                 dcc.Dropdown(
                                     id='pitcher-dropdown',
                                     options=pitcher_options,
-                                    placeholder='Select a pitcher',
-                                    style={'marginBottom': '15px'}
+                                    placeholder='Select a pitcher'
                                 ),
 
-                                html.Label("Batter", style={'fontWeight': 'bold', 'marginBottom': '5px'}),
+                                html.Label("Batter"),
                                 dcc.Dropdown(
                                     id='batter-dropdown',
                                     options=batter_options,
-                                    placeholder='Select a batter',
-                                    style={'marginBottom': '20px'}
+                                    placeholder='Select a batter'
                                 ),
 
                                 dcc.Loading(
@@ -145,16 +129,7 @@ app.layout = html.Div([
                                             html.Button(
                                                 'Run Model',
                                                 id='run-model',
-                                                n_clicks=0,
-                                                style={
-                                                    'backgroundColor': '#349eeb',
-                                                    'color': 'white',
-                                                    'border': 'none',
-                                                    'padding': '10px 20px',
-                                                    'textAlign': 'center',
-                                                    'fontSize': '16px',
-                                                    'borderRadius': '5px'
-                                                }
+                                                n_clicks=0
                                             )
                                         ])
                                         ],
@@ -166,36 +141,21 @@ app.layout = html.Div([
 
                         # Right: Batter headshot
                         html.Div(
-                            id="input-batter-headshot",
-                            style={'width': '150px'}
+                            id="input-batter-headshot"
                         )
                     ]),
             ]),
     
-    html.Div(id='output-screen', style={'display': 'none', 'flexDirection':'row', 'width':'100%', 'height':'100%'}, children=[
+    html.Div(id='output-screen', className='hidden-page', children=[
 
-        html.Div(style={'width':'50%', 'justifyContent': 'center', 'textAlign': 'center', 'paddingTop':'20px'}, 
+        html.Div(id='left-output-screen',
                  children=[
             html.Div(
-                style={
-                    'display': 'flex',
-                    'flexDirection': 'row',
-                    'alignItems': 'center',
-                    'justifyContent': 'center',
-                    'width': '100%',
-                    'gap': '20px',
-                    "marginBottom": "10px",  
-                    "paddingBottom": "10px"
-                },
+                id='matchup-id-section',
                 children=[
                     html.Div(id='pitcher-headshot-container', style={'flex': '0 0 auto'}),
                     html.Div(
-                        style={
-                            'display': 'flex',
-                            'flexDirection': 'column',
-                            'justifyContent': 'center',
-                            'textAlign': 'center'
-                        },
+                        id='matchup-text',
                         children=[
                             html.Div(id="pitcher-name-container"),
                             html.P("vs."),
@@ -205,18 +165,17 @@ app.layout = html.Div([
                     html.Div(id='batter-headshot-container', style={'flex': '0 0 auto'})
                 ]
             ),
-            html.Div(id='summary-output',
-                     style={'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center', 'width': '100%'}),
+            html.Div(id='summary-output'),
         ]), 
-        html.Div(style={'width':'50%', 'justifyContent': 'center', 'alignItems': 'center', 'textAlign': 'center'}, children=[
-            html.Div(id="summary-table", 
-                     style={'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center', 'width': '100%', 'margin-top':'50px'}),
-            html.Div(style={'display':'flex', 'flexDirection':'row', 'justifyContent': 'center', 'alignItems': 'center'}, 
+        html.Div(
+            id='right-output-screen', children=[
+            html.Div(id="summary-table"),
+            html.Div(
+                id='pitch-plots',
                      children=[
                          html.Div([
                              html.H3('Pitch Break'),
                              dcc.Graph(id='pitch-break-plot', 
-                        style={'height':'345px', 'border': '1px solid black', 'padding-left':'5px', 'padding-bottom':'5px', 'margin-top':'5px', 'margin-right':'5px'},
                         config={
                             'modeBarButtonsToRemove': [
                                 'zoom2d', 'pan2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 
@@ -229,7 +188,6 @@ app.layout = html.Div([
                          html.Div([
                              html.H3('Pitch Location'),
                              dcc.Graph(id='scatter-plot', 
-                        style={'height':'350px', 'border': '1px solid black', 'margin-top':'5px', 'margin-left':'5px'},
                         config={
                             'modeBarButtonsToRemove': [
                                 'zoom2d', 'pan2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 
@@ -245,25 +203,12 @@ app.layout = html.Div([
             ])
             
         ]),
-        html.Button("⚙ Filters", id="open-popup", style={
-                "position": "fixed",
-                "top": "20px",
-                "right": "20px",
-                "zIndex": 1000,
-                "padding": "10px 18px",
-                "backgroundColor": "rgb(230, 230, 230)",   # dark slate gray
-                "color": "black",
-                "border": "none",
-                "borderRadius": "8px",
-                "fontSize": "12px",
-                "fontWeight": "500",
-                "cursor": "pointer",
-            },),
+        html.Button("⚙ Filters", id="open-popup"),
         html.Div(
             id="popup",
             children=[
                 html.Div([
-                    html.H2("Filters", style={"marginBottom": "20px", "borderBottom": "2px solid #ccc", "paddingBottom": "8px"}),
+                    html.H2("Filters", id="filters-header"),
 
                     # Pitch type filter
                     html.Div([
@@ -362,8 +307,8 @@ style={'fontFamily': 'Arial, sans-serif'})
 @app.callback(
     Output('data-store', 'data'),
     Output('loading-overlay-output', 'children'),
-    Output('input-screen', 'style'),
-    Output('output-screen', 'style'),
+    Output('input-screen', 'className'),
+    Output('output-screen', 'className'),
     Input('run-model', 'n_clicks'),
     Input('back-button', 'n_clicks'),
     State('batter-dropdown', 'value'),
@@ -377,8 +322,8 @@ def run_model(n_clicks, back_clicks, batter, pitcher):
 
     button_id = context.triggered[0]['prop_id'].split('.')[0]
 
-    input_style = {'display': 'block'}
-    output_style = {'display': 'none'}
+    input_style = 'visible-page'
+    output_style = 'hidden-page'
 
     if button_id == 'back-button':
         return None, dash.no_update, input_style, output_style
@@ -392,7 +337,7 @@ def run_model(n_clicks, back_clicks, batter, pitcher):
     key = str(uuid.uuid4())
     cache.set(key, df, timeout=600)  # store for 10 minutes
 
-    return key, dash.no_update, {'display': 'none'}, {'display': 'flex'}
+    return key, dash.no_update, 'hidden-page', 'visible-page'
 
 @app.callback(
     Output('summary-output', 'children'),
@@ -447,69 +392,94 @@ def update_summary(selectedData, stored_data, applied_filters):
     summary_stats['zone_pct'] = f"{summary_stats['zone_pct']*100:.1f}"
     
 
-    return html.Div([
-        html.H3("Summary Data"),
-        dash_table.DataTable(
-            data=pd.DataFrame([summary_stats])[['total_pitches', 'batted_balls', 'swings']].to_dict('records'),
-            columns=[
-                {"name":"Total Pitches", "id":"total_pitches"},
-                {"name":"Swings", "id":"swings"},
-                {"name":"Batted Balls", "id":"batted_balls"}
-            ],
-            style_table={'overflowX': 'auto', 'border': '1px solid black'},
-            style_header={'backgroundColor': 'rgb(230, 230, 230)', 'fontWeight': 'bold', 'textAlign': 'center'},
-            style_cell={'padding': '8px', 'textAlign': 'center', 'fontFamily': 'Arial', 'fontSize': '14px', 'minWidth': '50px', 'width': '80px', 'maxWidth': '150px'}
-        ),
-        html.H3("Rate Stats"),
-        dash_table.DataTable(
-            data=pd.DataFrame([summary_stats])[['avg', 'obp', 'slg', 'ops', 'woba', 'k_pct', 'bb_pct']].to_dict('records'),
-            columns=[
-                {"name":"AVG", "id":"avg"},
-                {"name":"OBP", "id":"obp"},
-                {"name":"SLG", "id":"slg"},
-                {"name":"OPS", "id":"ops"},
-                {"name":"wOBA", "id":"woba"},
-                {"name":"K%", "id":"k_pct"},
-                {"name":"BB%", "id":"bb_pct"}
-            ],
-            style_table={'overflowX': 'auto', 'border': '1px solid black'},
-            style_header={'backgroundColor': 'rgb(230, 230, 230)', 'fontWeight': 'bold', 'textAlign': 'center'},
-            style_cell={'padding': '8px', 'textAlign': 'center', 'fontFamily': 'Arial', 'fontSize': '14px', 'minWidth': '50px', 'width': '80px', 'maxWidth': '150px'}
-        ),
-        html.H3("Stats per 600 PA"),
-        dash_table.DataTable(
-            data=pd.DataFrame([summary_stats])[['1B_per_600', '2B_per_600', '3B_per_600', 'HR_per_600', 'BB_per_600', 'K_per_600']].to_dict('records'),
-            columns=[
-                {"name":"1B", "id":"1B_per_600"},
-                {"name":"2B", "id":"2B_per_600"},
-                {"name":"3B", "id":"3B_per_600"},
-                {"name":"HR", "id":"HR_per_600"},
-                {"name":"BB", "id":"BB_per_600"},
-                {"name":"K", "id":"K_per_600"}
-            ],
-            style_table={'overflowX': 'auto', 'border': '1px solid black'},
-            style_header={'backgroundColor': 'rgb(230, 230, 230)', 'fontWeight': 'bold', 'textAlign': 'center'},
-            style_cell={'padding': '8px', 'textAlign': 'center', 'fontFamily': 'Arial', 'fontSize': '14px', 'minWidth': '50px', 'width': '80px', 'maxWidth': '150px'}
-        ),
-        html.H3("Plate Discipline"),
-        dash_table.DataTable(
-            data=pd.DataFrame([summary_stats])[['swing_pct', 'zswing_pct', 'oswing_pct', 'contact_pct', 'zcontact_pct', 'ocontact_pct', 'swstr_pct', 'zone_pct']].to_dict('records'),
-            columns=[
-                {"name":"Swing%", "id":"swing_pct"},
-                {"name":"Z-Swing%", "id":"zswing_pct"},
-                {"name":"O-Swing%", "id":"oswing_pct"},
-                {"name":"Contact%", "id":"contact_pct"},
-                {"name":"Z-Contact%", "id":"zcontact_pct"},
-                {"name":"O-Contact%", "id":"ocontact_pct"},
-                {"name":"SwStr%", "id":"swstr_pct"},
-                {"name":"Zone%", "id":"zone_pct"}
-            ],
-            style_table={'overflowX': 'auto', 'border': '1px solid black'},
-            style_header={'backgroundColor': 'rgb(230, 230, 230)', 'fontWeight': 'bold', 'textAlign': 'center'},
-            style_cell={'padding': '8px', 'textAlign': 'center', 'fontFamily': 'Arial', 'fontSize': '14px', 'minWidth': '50px', 'width': '80px', 'maxWidth': '150px'}
-        )
-    ],
-    style={'width': 'fit-content'})
+    return html.Div(
+        id='result-tables',
+        children=[
+            html.H3("Summary Data"),
+            html.Div(
+                className="data-table",
+                children=[
+                    dash_table.DataTable(
+                        data=pd.DataFrame([summary_stats])[['total_pitches', 'batted_balls', 'swings']].to_dict('records'),
+                        columns=[
+                            {"name":"Total Pitches", "id":"total_pitches"},
+                            {"name":"Swings", "id":"swings"},
+                            {"name":"Batted Balls", "id":"batted_balls"}
+                        ],
+                        style_table={'overflowX': 'auto', 'border': '1px solid black'},
+                        style_header={'backgroundColor': 'rgb(230, 230, 230)', 'fontWeight': 'bold', 'textAlign': 'center'},
+                        style_cell={'padding': '8px', 'textAlign': 'center', 'fontFamily': 'Arial', 'fontSize': '14px', 'minWidth': '50px', 'width': '80px', 'maxWidth': '150px'}
+                    ),
+                ]
+            ),
+            
+            html.H3("Rate Stats"),
+            html.Div(
+                className="data-table",
+                children=[
+                    dash_table.DataTable(
+                        data=pd.DataFrame([summary_stats])[['avg', 'obp', 'slg', 'ops', 'woba', 'k_pct', 'bb_pct']].to_dict('records'),
+                        columns=[
+                            {"name":"AVG", "id":"avg"},
+                            {"name":"OBP", "id":"obp"},
+                            {"name":"SLG", "id":"slg"},
+                            {"name":"OPS", "id":"ops"},
+                            {"name":"wOBA", "id":"woba"},
+                            {"name":"K%", "id":"k_pct"},
+                            {"name":"BB%", "id":"bb_pct"}
+                        ],
+                        style_table={'overflowX': 'auto', 'border': '1px solid black'},
+                        style_header={'backgroundColor': 'rgb(230, 230, 230)', 'fontWeight': 'bold', 'textAlign': 'center'},
+                        style_cell={'padding': '8px', 'textAlign': 'center', 'fontFamily': 'Arial', 'fontSize': '14px', 'minWidth': '50px', 'width': '80px', 'maxWidth': '150px'}
+                    )
+                ]
+            ),
+            
+            html.H3("Stats per 600 PA"),
+            html.Div(
+                className='data-table',
+                children=[
+                    dash_table.DataTable(
+                        data=pd.DataFrame([summary_stats])[['1B_per_600', '2B_per_600', '3B_per_600', 'HR_per_600', 'BB_per_600', 'K_per_600']].to_dict('records'),
+                        columns=[
+                            {"name":"1B", "id":"1B_per_600"},
+                            {"name":"2B", "id":"2B_per_600"},
+                            {"name":"3B", "id":"3B_per_600"},
+                            {"name":"HR", "id":"HR_per_600"},
+                            {"name":"BB", "id":"BB_per_600"},
+                            {"name":"K", "id":"K_per_600"}
+                        ],
+                        style_table={'overflowX': 'auto', 'border': '1px solid black'},
+                        style_header={'backgroundColor': 'rgb(230, 230, 230)', 'fontWeight': 'bold', 'textAlign': 'center'},
+                        style_cell={'padding': '8px', 'textAlign': 'center', 'fontFamily': 'Arial', 'fontSize': '14px', 'minWidth': '50px', 'width': '80px', 'maxWidth': '150px'}
+                    )
+                ]
+            ),
+            
+            html.H3("Plate Discipline"),
+            html.Div(
+                className='data-table',
+                children=[
+                    dash_table.DataTable(
+                        data=pd.DataFrame([summary_stats])[['swing_pct', 'zswing_pct', 'oswing_pct', 'contact_pct', 'zcontact_pct', 'ocontact_pct', 'swstr_pct', 'zone_pct']].to_dict('records'),
+                        columns=[
+                            {"name":"Swing%", "id":"swing_pct"},
+                            {"name":"Z-Swing%", "id":"zswing_pct"},
+                            {"name":"O-Swing%", "id":"oswing_pct"},
+                            {"name":"Contact%", "id":"contact_pct"},
+                            {"name":"Z-Contact%", "id":"zcontact_pct"},
+                            {"name":"O-Contact%", "id":"ocontact_pct"},
+                            {"name":"SwStr%", "id":"swstr_pct"},
+                            {"name":"Zone%", "id":"zone_pct"}
+                        ],
+                        style_table={'overflowX': 'auto', 'border': '1px solid black'},
+                        style_header={'backgroundColor': 'rgb(230, 230, 230)', 'fontWeight': 'bold', 'textAlign': 'center'},
+                        style_cell={'padding': '8px', 'textAlign': 'center', 'fontFamily': 'Arial', 'fontSize': '14px', 'minWidth': '50px', 'width': '80px', 'maxWidth': '150px'}
+                    )
+                ]
+            )
+    ]
+)
 
 @app.callback(
     Output('summary-table', 'children'),
@@ -549,22 +519,24 @@ def update_pitches_summary_table(selectedData, stored_data, applied_filters):
     summary_stats['pfx_x'] = summary_stats['pfx_x'].map(lambda x: f"{x:.1f}")
     summary_stats['pfx_z'] = summary_stats['pfx_z'].map(lambda x: f"{x:.1f}")
 
-    return html.Div([
-        html.H3("Pitch Data"),
-        dash_table.DataTable(
-            data=summary_stats.to_dict('records'),
-            columns=[{"name":"Pitch Type", "id":"pitch_type"},
-                    {"name":"%", "id":"pct"}, 
-                    {"name":"Velocity", "id":"release_speed"}, 
-                    {"name":"Spin Rate", "id":"release_spin_rate"},
-                    {"name":"Horz. Break (in)", "id":"pfx_x"},
-                    {"name":"Vert. Break (in)", "id":"pfx_z"},
-            ],
-            style_table={'overflowX': 'auto', 'border': '1px solid black'},
-            style_header={'backgroundColor': 'rgb(230, 230, 230)', 'fontWeight': 'bold', 'textAlign': 'center'},
-            style_cell={'padding': '8px', 'textAlign': 'center', 'fontFamily': 'Arial', 'fontSize': '14px', 'minWidth': '50px', 'width': '80px', 'maxWidth': '150px'}
-        )],
-        style={'width': '89%'}
+    return html.Div(
+        id='pitch-table',
+        children=[
+            html.H3("Pitch Data"),
+            dash_table.DataTable(
+                data=summary_stats.to_dict('records'),
+                columns=[{"name":"Pitch Type", "id":"pitch_type"},
+                        {"name":"%", "id":"pct"}, 
+                        {"name":"Velocity", "id":"release_speed"}, 
+                        {"name":"Spin Rate", "id":"release_spin_rate"},
+                        {"name":"Horz. Break (in)", "id":"pfx_x"},
+                        {"name":"Vert. Break (in)", "id":"pfx_z"},
+                ],
+                style_table={'overflowX': 'auto', 'border': '1px solid black'},
+                style_header={'backgroundColor': 'rgb(230, 230, 230)', 'fontWeight': 'bold', 'textAlign': 'center'},
+                style_cell={'padding': '8px', 'textAlign': 'center', 'fontFamily': 'Arial', 'fontSize': '14px', 'minWidth': '50px', 'width': '80px', 'maxWidth': '150px'}
+            )
+        ]
     )
 
 @app.callback(
@@ -593,8 +565,8 @@ def update_pitch_type_checklist(stored_data):
 )
 def update_headshots(pitcher_id, batter_id):
     pitcher_img = html.Img(
-        src=f'https://img.mlbstatic.com/mlb-photos/image/upload/v1/people/{pitcher_id}/headshot/67/current.png',
-        style={'height': '150px', 'border': '1px solid black', 'borderRadius': '4px'}
+        id="pitcher-headshot",
+        src=f'https://img.mlbstatic.com/mlb-photos/image/upload/v1/people/{pitcher_id}/headshot/67/current.png'
     ) if pitcher_id else ""
 
     pitcher_name = html.H2(
@@ -603,8 +575,8 @@ def update_headshots(pitcher_id, batter_id):
     ) if pitcher_id else ""
     
     batter_img = html.Img(
-        src=f'https://img.mlbstatic.com/mlb-photos/image/upload/v1/people/{batter_id}/headshot/67/current.png',
-        style={'height': '150px', 'border': '1px solid black', 'borderRadius': '4px'}
+        id="batter-headshot",
+        src=f'https://img.mlbstatic.com/mlb-photos/image/upload/v1/people/{batter_id}/headshot/67/current.png'
     ) if batter_id else ""
 
     batter_name = html.H2(
@@ -620,8 +592,8 @@ def update_headshots(pitcher_id, batter_id):
 )
 def update_input_pitcher_headshots(pitcher_id):
     pitcher_img = html.Img(
+        id='pitcher-dropdown-headshot',
         src=f'https://img.mlbstatic.com/mlb-photos/image/upload/v1/people/{pitcher_id}/headshot/67/current.png',
-        style={'height': '150px', 'border': '1px solid black', 'borderRadius': '4px'}
     ) if pitcher_id else ""
     
     return pitcher_img
@@ -632,8 +604,8 @@ def update_input_pitcher_headshots(pitcher_id):
 )
 def update_input_batter_headshots(batter_id):
     batter_img = html.Img(
-        src=f'https://img.mlbstatic.com/mlb-photos/image/upload/v1/people/{batter_id}/headshot/67/current.png',
-        style={'height': '150px', 'border': '1px solid black', 'borderRadius': '4px'}
+        id='batter-dropdown-headshot',
+        src=f'https://img.mlbstatic.com/mlb-photos/image/upload/v1/people/{batter_id}/headshot/67/current.png'
     ) if batter_id else ""
     
     return batter_img
