@@ -93,6 +93,111 @@ app.layout = html.Div([
              children=[
                 html.H1("MLB Matchup Simulator"),
                 html.P("Created by Timothy Clay"),
+                html.Button("About This Project", id="about-page"),
+                html.Div(
+                    id="about-popup",
+                    children=[
+                        html.Div([
+                            html.H2("About This Project", id="about-header"),
+
+                            # Close button
+                            html.Div([
+                                html.Button("X", id="close-about", n_clicks=0, style={
+                                    "background": "white", "color": "gray",
+                                    "border": "none", "padding": "8px 12px",
+                                    "borderRadius": "10px", "cursor": "pointer",
+                                    "fontWeight": "bold", "fontSize":"15px"
+                                })
+                            ], style={"position": "absolute", "top": "25px", "right": "25px", "background": "transparent", "border": "none", "fontSize": "20px", "fontWeight": "bold", "cursor": "pointer", "color": "#333"}),
+
+                            html.P("This site is an interactive summary dashboard that I created and published for my MLB matchup simulation project. I worked on and completed this personal project in its entirely in my free time during my 2025 summer internship with the Washington Nationals. A more thorough write-up of my methodology is included in the sections below. "),
+                            html.P('To use the dashboard, enter a pitcher and batter using the dropdowns on the main page, then click the “Run Models” button. Once the models have run (which may take up to 30 seconds), it will load a new page that shows the simulation outcomes, allowing you to filter by pitch type, count, and pitch location. '),
+                            html.P("With any questions, please feel free to reach me at clay.t@northeastern.edu. I hope you find this project as interesting as I did!"),
+                            html.H3("Background / Abstract"),
+                            html.P("The goal behind this project was to understand how different types of batters would fare against different types of pitchers over hundreds of plate appearances. I approached this projected with a Monte Carlo simulation, which generates thousands of pitches using realistic outcome probabilities, as produced by five feed-forward neural networks. Each of the five models considers a different aspect of the pitch, with models for pitch type, pitch location, swing decision, contact result, and batted ball outcome. To simulate a full plate appearance, I simply simulate individual pitches until an end condition (walk/strikeout/ball in play) is reached. Repeat this process for hundreds or thousands of iterations, and you can start to understand the long-term trends that may begin to appear. In my dashboard, I show these long-term trends, highlighting average pitch characteristics and usage rates, plate discipline and contact rates, per-600-PA counting stats, and more. "),
+                            html.H3("Modeling Methodology"),
+                            html.P("The heart of this entire project boils down to the five feed-forward neural networks that I use to predict individual aspects of a pitch. Two of the five predict what I would call pitcher-level features: the pitch type and its location. The remaining three models predict what I would call hitter-level features: the batter’s swing decision, contact result (if applicable), and batted ball outcome (if applicable). The models are all architecturally alike, which allowed for consistency across model training and evaluation. The models, however, do not all have the same inputs, which I discuss further below. "),
+                            html.H4("Model Inputs"),
+                            html.P('As each of the five models occurs predicts a “decision” that happens at a different point in the process of a pitch (e.g., a pitch type needs to be chosen before the batter decides whether to swing), the models cannot have the same exact inputs, though there is considerable overlap. Each of the five models share 21 inputs, with four of the five sharing 30: '),
+                            html.Ul([
+                                html.Li("4 capture situational context (count and handedness)"),
+                                html.Li("8 capture batter swing characteristics (average swing speed, average swing length, etc.)"),
+                                html.Li("9 capture batter plate discipline (swing and contact rates, hard-hit rate, etc.)"),
+                                html.Li("9 capture pitch characteristics (velocity, spin, etc.) (NOTE: the pitch type model does not take these as inputs)"),
+                            ]),
+                            html.P("For the pitch type and pitch location models, they both also share 18 additional inputs, which all deal with the size of the pitcher’s arsenal. 17 of those 18 inputs are binary encodings indicating whether the pitcher has each possible pitch type in their arsenal, with the last input being a numeric count of how many total types of pitches are in the pitcher’s arsenal. Both models also take as input the ID of the pitcher. This input ID is then converted into a 4-dimensional encoding, which is combined with the rest of the data before training. The pitch location model also takes as input the chosen pitch type, which is then converted to an additional 8-dimensional encoding. The three hitter-level models, meanwhile, only have two unique inputs: the x and z coordinates of the pitch. "),
+                            html.P("To process each of these inputs to be model-readable, I one-hot encoded all categorical variables and normalized all inputs to remove any biases related to unit size. I also implemented Bayesian shrinking for the plate discipline stats to prevent any players with small sample sizes from having misleading and outlier rate stats (such as a 100% swing rate)."),
+                            html.H4("Model Architectures"),
+                            html.P("To maintain consistency across each of my neural networks, I decided to standardize the architecture across all models. Each model was a single feed-forward neural network with 3 hidden layers. The first hidden layer was 128 dimensions, the second hidden layer was 64 dimensions, and the third hidden layer was only 32 dimensions. The first two hidden layers both included batch normalization and 10% dropout for regularization, while the final hidden layer only applies a ReLU activation before the output layer."),
+                            html.P("Each of the five models also all work by outputting class probabilities (as opposed to a continuous value). For four of the five models, this makes logical sense; pitch type is clearly a multi-class categorical variable, and each of swing decision, contact result, and batted ball outcome can all be thought of as binary classification problems. For pitch location, however, intuition would suggest predicting a coordinate, rather than a class. I originally did construct the pitch location model this way, but I found that this implementation led to predictions that converged towards the center of the strike zone. This in turn resulted in inflated zone rates and deflated walk rates. To address this issue, I instead converted the pitch location into a categorical feature, dividing the potential pitch locations into a 10x10 grid with 100 different buckets, ranging from -2 feet to +2 feet on the x-axis and from 0 to 5 feet on the y-axis. While this approach sacrifices some granularity, the tradeoff for increased accuracy was well worth it. I may revisit this approach in the future to consider alternative ways to predict pitch location as a set of continuous variables, but for the time being, I’m satisfied with this approach."),
+                            html.H4("Model Evaluation"),
+                            html.P("To train my models, I used pitch-by-pitch data for every MLB game between the 2023 and 2025 All-Star breaks. Due to the differences in their inputs and outputs, each model had to be trained with a slightly different dataframe. The sizes of these dataframes are as follows:"),
+                            html.Ul([
+                                html.Li("Pitch Type Model: 1,427,534 observations"),
+                                html.Li("Pitch Location Model: 1,412,234 observations"),
+                                html.Li("Swing Decision Model: 1,415,269 observations"),
+                                html.Li("Contact Result Model: 677,297 observations"),
+                                html.Li("Batted Ball Outcome Model: 478,198 observations"),
+                            ]),
+                            html.P("Before training each model, I split the respective dataframe into training and testing splits. Each training split was 80% of the total observations, with the remaining 20% being used for model evaluation. During training, I evaluated each model using log loss. I chose this error metric because it successfully balanced rewarding the model for being confidently correct while penalizing it for being confidently incorrect. I was able to use the same error metric across all models because of the previously mentioned design decision to make each model predict class probabilities. "),
+                            html.P("I trained each model for a maximum of 50 epochs. For each epoch, the model would learn the training data in batches of 64 observations and then predict on batches of testing data. If the log loss among the testing data did not improve in 10 epochs, I implemented early stopping to prevent overfitting. The final validation log loss for each of my models is shown below:"),
+                            html.Ul([
+                                html.Li("Pitch Type Model (17 classes): 1.248"),
+                                html.Li("Pitch Location Model (100 classes): 3.696"),
+                                html.Li("Swing Decision Model (2 classes): 0.425"),
+                                html.Li("Contact Result Model (2 classes): 0.452"),
+                                html.Li("Batted Ball Outcome Model (9 classes): 1.457"),
+                            ]),
+                            html.H3("Simulation Logic"),
+                            html.P("With these five models, I was then able to simulate realistic outcomes for individual pitches. To sample a single pitch, I first pulled all the relevant information for the specified batter and the specified pitcher. This included information such as the batter’s plate discipline trends and the pitcher’s arsenal. This combined row of data contained all necessary information to be then passed into each subsequent model. "),
+                            html.P("The first model in the pitch-simulation assembly line is the pitch type model. Intuitively, this model outputs a set of probabilities that each possible pitch type will be throw. The simulation loop then randomly samples from those outputs (using the probabilities as class weights). This pitch is then added to the row of data, and the simulation continues. "),
+                            html.P("The next model the simulation uses is the pitch location model. Before passing the data to the pitch location model itself, the simulation loop fills in the relevant pitch characteristics based on the pitch type that was previously chosen. It does this by sampling a value for each pitch characteristic using that characteristic’s mean and standard deviation. With these added pitch characteristics, the simulation loop then passes the row into the pitch location model to predict the probability that the pitch will be thrown in each of the 100 pitch location buckets. The loop then samples from those buckets using their class probabilities, then chooses the specific point within that bucket by taking a random point within the bucket’s bounds. This location coordinate is then added to the row, and the simulation continues. "),
+                            html.P("The final step(s) of the pitch-level simulation call the three hitter-level models. The simulation loop first gets the probability of a swing using the swing decision model, then samples from those probabilities whether the batter swung. If the sampled swing decision was not a swing, then the simulation end. Otherwise, the simulation continues by predicting and sampling whether the batter makes contact. Again, if the sample contact result did not result in contact, the simulation ends. If the simulation loop predicts that the batter will both swing and make contact, however, the last step in the process is to predict the outcome of that contact. As with all the other models, this model predicts the probability of each batted ball outcome, including fouls, and samples from those probabilities to choose the result of the swing. "),
+                            html.P("When the pitch-level simulation has finished, the model returns the row. When multiple pitches are being simulated in succession, these rows can be appended together as a dataframe. "),
+                            html.P("To simulate plate appearances, the model continues to simulate individual pitches, adding to a cumulative dataframe of pitch results, until a stop condition is met. A stop condition only happens when the batter walks (takes a ball with 3 balls), strikes out (takes or swings at a strike with 2 strikes) or puts the ball into play in fair territory. After each pitch, the plate appearance simulation checks these conditions and only stops if one is met. When a stop condition is reached, the simulation returns the cumulative dataframe containing the outcomes of each individual pitch. This plate-appearance-level simulation can iterate for any specified number of times and can continue to add upon one large cumulative result dataframe. Throughout my project, I defaulted to simulating 1,000 plate appearances for each match-up.  "),
+                            html.H3("Summary Dashboard"),
+                            html.P("The last step of my project (for now!) was to make the results of my simulations easy to access and explore. To do this, I developed this very dashboard using Plotly Dash in Python. This was my first large-scale project using the framework, so there was a bit of a learning curve, but I was pleased by the level of control I had over the site’s functionality and appearance, and it was exceptionally easy to integrate the Plotly visualizations I made throughout the process. "),
+                            html.P("Hosting this site on the web was also a new experience, as it required me to launch and manage an AWS EC2 instance and connect said instance to my domain name (app.timothyclay.dev). When finalizing the site, I had to make some tweaks to the code for performance and compatibility reasons. For instance, instead of storing the results of my simulations in local memory, I incorporated Redis to cache the data. Despite this tweak, I was still slightly disappointed in the spike in runtime transitioning from my local machine to the EC2 instance. In the future, I may look to try to parallelize the plate appearance simulations to decrease the overall runtime.  "),
+                            html.H3("Future Work"),
+                            html.P("Beyond the work I’ve already done, I’m excited to continue exploring how I may be able to turn the results of my simulations into more usable and actionable tools. I have a variety of potential ideas for future applications of this work, including substitution and lineup optimization.   "),
+                            html.P("For substitution optimization, I believe that these simulation models could be valuable tools to help decide which relief pitchers or pinch hitters to bring in. In both cases, understanding which available players are likely to see the most success over the long run help inform the decision of which player to use. These tools should be fairly easy to implement, and I’m looking forward to creating them soon. "),
+                            html.P("Another potential downstream use case for this project is lineup optimization. While my simulation is currently base-out-state-agnostic, I could very easily tweak the simulation logic to allow for bases and outs to be recorded. In doing so, it would be possible to simulate the production of an entire lineup against a given pitcher. This could help teams optimize their lineup construction by choosing the lineup that is expected to produce the most runs."),
+                            html.P("Both ideas are what I believe to be the tip of the iceberg when it comes to future applications of this project. Having a way to simulate the expected outcomes of any pitcher/batter match-up will be incredibly valuable and will open tons of doors for future research. As I continue to refine this project, I’m excited to continue exploring possible applications of this work, and I will be sure to share any subsequent projects I tackle."),
+
+                            html.Div([
+                                html.Button("← Return to Dashboard", id="close-about-2", n_clicks=0, style={
+                                    "background": "#349eeb", "color": "white",
+                                    "border": "none", "padding": "8px 16px",
+                                    "borderRadius": "6px", "cursor": "pointer", "marginTop":"20px",
+                                    "fontWeight": "bold", "fontSize":"15px"
+                                })
+                            ], style={"background": "transparent", "border": "none", "fontSize": "20px", "fontWeight": "bold", "cursor": "pointer", "color": "#333"}),
+
+                        ], className="modal-box", style={
+                            "background": "white",
+                            "padding": "25px",
+                            "borderRadius": "10px",
+                            "boxShadow": "0 4px 20px rgba(0,0,0,0.2)",
+                            "width": "70%",
+                            "maxWidth": "800px",
+                            "maxHeight": "80vh",
+                            "overflowY": "auto",
+                            "position":"relative"
+                        })
+                    ],
+                    style={
+                        "position": "fixed",
+                        "top": 0,
+                        "left": 0,
+                        "width": "100vw",
+                        "height": "100vh",
+                        "backgroundColor": "rgba(0, 0, 0, 0.5)",
+                        "display": "none",  # toggled via callback
+                        "alignItems": "center",
+                        "justifyContent": "center",
+                        "zIndex": 1000
+                    }
+                ),
                 html.Div(
                     id='input-screen-container',
                     children=[
@@ -145,6 +250,8 @@ app.layout = html.Div([
                         )
                     ]),
             ]),
+
+    
     
     html.Div(id='output-screen', className='hidden-page', children=[
 
@@ -836,6 +943,37 @@ def apply_filters(n_clicks, pitch_types, counts):
         'pitch_types': pitch_types,
         'counts': counts
     }
+
+@app.callback(
+    Output("about-popup", "style"),
+    Input("about-page", "n_clicks"),
+    Input("close-about", "n_clicks"),
+    Input("close-about-2", "n_clicks"),
+    prevent_initial_call=True
+)
+def manage_about_page(open_clicks, close_clicks, close_clicks_2):
+    ctx = dash.callback_context
+
+    if not ctx.triggered:
+        raise dash.exceptions.PreventUpdate
+
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    if button_id == "about-page":
+        return {
+            "position": "fixed",
+            "top": 0,
+            "left": 0,
+            "width": "100vw",
+            "height": "100vh",
+            "backgroundColor": "rgba(0, 0, 0, 0.5)",
+            "display": "flex", 
+            "alignItems": "center",
+            "justifyContent": "center",
+            "zIndex": 1000
+        }
+    else:
+        return {"display": "none"}
 
 
 if __name__ == "__main__":
